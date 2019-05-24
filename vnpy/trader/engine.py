@@ -19,6 +19,7 @@ from .event import (
     EVENT_POSITION,
     EVENT_ACCOUNT,
     EVENT_CONTRACT,
+    EVENT_SYMBOL_ACTIVATE,
     EVENT_LOG
 )
 from .gateway import BaseGateway
@@ -317,6 +318,7 @@ class OmsEngine(BaseEngine):
         self.event_engine.register(EVENT_POSITION, self.process_position_event)
         self.event_engine.register(EVENT_ACCOUNT, self.process_account_event)
         self.event_engine.register(EVENT_CONTRACT, self.process_contract_event)
+        self.event_engine.register(EVENT_SYMBOL_ACTIVATE, self.process_symbol_activate_event)
 
     def process_tick_event(self, event: Event):
         """"""
@@ -354,6 +356,10 @@ class OmsEngine(BaseEngine):
         """"""
         contract = event.data
         self.contracts[contract.vt_symbol] = contract
+
+    def process_symbol_activate_event(self, event: Event):
+        """"""
+        pass
 
     def get_tick(self, vt_symbol):
         """

@@ -17,9 +17,10 @@ from ..event import (
     EVENT_ORDER,
     EVENT_POSITION,
     EVENT_ACCOUNT,
+    EVENT_SYMBOL_ACTIVATE,
     EVENT_LOG
 )
-from ..object import OrderRequest, SubscribeRequest
+from ..object import OrderRequest, SubscribeRequest, SymbolData
 from ..utility import load_json, save_json
 
 COLOR_LONG = QtGui.QColor("red")
@@ -215,6 +216,8 @@ class BaseMonitor(QtWidgets.QTableWidget):
         self.setEditTriggers(self.NoEditTriggers)
         self.setAlternatingRowColors(True)
         self.setSortingEnabled(self.sorting)
+        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
 
     def init_menu(self):
         """
@@ -564,6 +567,7 @@ class TradingWidget(QtWidgets.QWidget):
     """
 
     signal_tick = QtCore.pyqtSignal(Event)
+    signal_symbol_activate = QtCore.pyqtSignal(Event)
 
     def __init__(self, main_engine: MainEngine, event_engine: EventEngine):
         """"""
@@ -707,6 +711,8 @@ class TradingWidget(QtWidgets.QWidget):
         """"""
         self.signal_tick.connect(self.process_tick_event)
         self.event_engine.register(EVENT_TICK, self.signal_tick.emit)
+        self.signal_symbol_activate.connect(self.process_symbol_activate_event)
+        self.event_engine.register(EVENT_SYMBOL_ACTIVATE, self.signal_symbol_activate.emit)
 
     def process_tick_event(self, event: Event):
         """"""
@@ -744,6 +750,13 @@ class TradingWidget(QtWidgets.QWidget):
             self.bv5_label.setText(str(tick.bid_volume_5))
             self.ap5_label.setText(str(tick.ask_price_5))
             self.av5_label.setText(str(tick.ask_volume_5))
+
+    def process_symbol_activate_event(self, event: Event):
+        """"""
+        contract = event.data
+        self.exchange_combo.setCurrentText(contract.exchange.value)
+        self.symbol_line.setText(contract.symbol)
+        self.set_vt_symbol()
 
     def set_vt_symbol(self):
         """
@@ -880,11 +893,12 @@ class ActiveOrderMonitor(OrderMonitor):
             self.hideRow(row)
 
 
-class ContractManager(QtWidgets.QWidget):
+class ContractTableWidget(QtWidgets.QTableWidget):
     """
-    Query contract data available to trade in system.
+    Contract Table Widget in VN Trader.
     """
 
+    sorting = True
     headers = {
         "vt_symbol": "本地代码",
         "symbol": "代码",
@@ -896,6 +910,146 @@ class ContractManager(QtWidgets.QWidget):
         "min_volume": "最小委托量",
         "gateway_name": "交易接口",
     }
+    
+    signal = QtCore.pyqtSignal(Event)
+
+    def __init__(self, main_engine: MainEngine, event_engine: EventEngine):
+        """"""
+        super(ContractTableWidget, self).__init__()
+
+        self.main_engine = main_engine
+        self.event_engine = event_engine
+
+        self.init_ui()
+
+    def init_ui(self):
+        """"""
+        self.init_table()
+        self.init_menu()
+
+    def init_table(self):
+        """
+        Initialize table.
+        """
+        self.setColumnCount(len(self.headers))
+
+        # labels = [d["display"] for d in self.headers.values()]
+        labels = []
+        for name, display in self.headers.items():
+            label = f"{display}\n{name}"
+            labels.append(label)
+        self.setHorizontalHeaderLabels(labels)
+
+        self.verticalHeader().setVisible(False)
+        self.setEditTriggers(self.NoEditTriggers)
+        self.setAlternatingRowColors(True)
+        self.setSortingEnabled(self.sorting)
+        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.itemDoubleClicked.connect(self.on_item_double_clicked)
+
+    def init_menu(self):
+        """
+        Create right click menu.
+        """
+        self.menu = QtWidgets.QMenu(self)
+
+        resize_action = QtWidgets.QAction("调整列宽", self)
+        resize_action.triggered.connect(self.resize_columns)
+        self.menu.addAction(resize_action)
+
+        save_action = QtWidgets.QAction("保存数据", self)
+        save_action.triggered.connect(self.save_csv)
+        self.menu.addAction(save_action)
+
+        subscribe_action = QtWidgets.QAction("订阅行情", self)
+        subscribe_action.triggered.connect(self.subscribe)
+        self.menu.addAction(subscribe_action)
+
+    def show_contracts(self, contracts):
+        """
+        Show contracts
+        """
+
+        self.clearContents()
+        self.setRowCount(len(contracts))
+
+        for row, contract in enumerate(contracts):
+            for column, name in enumerate(self.headers.keys()):
+                value = getattr(contract, name)
+                if isinstance(value, Enum):
+                    cell = EnumCell(value, contract)
+                else:
+                    cell = BaseCell(value, contract)
+                self.setItem(row, column, cell)
+
+        self.resizeColumnsToContents()
+
+    def resize_columns(self):
+        """
+        Resize all columns according to contents.
+        """
+        self.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+
+    def save_csv(self):
+        """
+        Save table data into a csv file
+        """
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "保存数据", "", "CSV(*.csv)")
+
+        if not path:
+            return
+
+        with open(path, "w") as f:
+            writer = csv.writer(f, lineterminator="\n")
+
+            writer.writerow(self.headers.keys())
+
+            for row in range(self.rowCount()):
+                row_data = []
+                for column in range(self.columnCount()):
+                    item = self.item(row, column)
+                    if item:
+                        row_data.append(str(item.text()))
+                    else:
+                        row_data.append("")
+                writer.writerow(row_data)
+
+    def subscribe(self):  
+        cellSymbol = self.item(self.currentRow(),1)
+        cellExchange = self.item(self.currentRow(),2)
+        cellGateway = self.item(self.currentRow(),8)
+        strSymbol = str(cellSymbol.text())
+        strExchange = str(cellExchange.text())
+        strGateway = str(cellGateway.text())
+        # Subscribe tick data
+        req = SubscribeRequest(
+            symbol=strSymbol, exchange=Exchange(strExchange)
+        )
+
+        self.main_engine.subscribe(req, strGateway)
+
+        data = SymbolData(
+            gateway_name=strGateway, symbol=strSymbol, exchange=Exchange(strExchange)
+        )
+        event = Event(EVENT_SYMBOL_ACTIVATE, data)
+        self.event_engine.put(event)
+
+    def on_item_double_clicked(self):
+        self.subscribe()
+
+    def contextMenuEvent(self, event):
+        """
+        Show menu with right click.
+        """
+        self.menu.popup(QtGui.QCursor.pos())
+
+
+class ContractManager(QtWidgets.QWidget):
+    """
+    Query contract data available to trade in system.
+    """
 
     def __init__(self, main_engine, event_engine):
         super(ContractManager, self).__init__()
@@ -916,17 +1070,7 @@ class ContractManager(QtWidgets.QWidget):
         self.button_show = QtWidgets.QPushButton("查询")
         self.button_show.clicked.connect(self.show_contracts)
 
-        labels = []
-        for name, display in self.headers.items():
-            label = f"{display}\n{name}"
-            labels.append(label)
-
-        self.contract_table = QtWidgets.QTableWidget()
-        self.contract_table.setColumnCount(len(self.headers))
-        self.contract_table.setHorizontalHeaderLabels(labels)
-        self.contract_table.verticalHeader().setVisible(False)
-        self.contract_table.setEditTriggers(self.contract_table.NoEditTriggers)
-        self.contract_table.setAlternatingRowColors(True)
+        self.contract_table = ContractTableWidget(self.main_engine, self.event_engine)
 
         hbox = QtWidgets.QHBoxLayout()
         hbox.addWidget(self.filter_line)
@@ -952,19 +1096,7 @@ class ContractManager(QtWidgets.QWidget):
         else:
             contracts = all_contracts
 
-        self.contract_table.clearContents()
-        self.contract_table.setRowCount(len(contracts))
-
-        for row, contract in enumerate(contracts):
-            for column, name in enumerate(self.headers.keys()):
-                value = getattr(contract, name)
-                if isinstance(value, Enum):
-                    cell = EnumCell(value, contract)
-                else:
-                    cell = BaseCell(value, contract)
-                self.contract_table.setItem(row, column, cell)
-
-        self.contract_table.resizeColumnsToContents()
+        self.contract_table.show_contracts(contracts)
 
 
 class AboutDialog(QtWidgets.QDialog):

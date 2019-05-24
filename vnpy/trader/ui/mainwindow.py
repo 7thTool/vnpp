@@ -54,6 +54,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def init_dock(self):
         """"""
+        contract_widget, contract_dock = self.create_dock(
+            ContractManager, "合约", QtCore.Qt.RightDockWidgetArea
+        )
         trading_widget, trading_dock = self.create_dock(
             TradingWidget, "交易", QtCore.Qt.LeftDockWidgetArea
         )
@@ -79,6 +82,7 @@ class MainWindow(QtWidgets.QMainWindow):
             PositionMonitor, "持仓", QtCore.Qt.BottomDockWidgetArea
         )
 
+        self.tabifyDockWidget(tick_dock, contract_dock)
         self.tabifyDockWidget(active_dock, order_dock)
 
         self.save_window_setting("default")

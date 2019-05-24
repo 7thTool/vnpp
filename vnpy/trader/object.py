@@ -20,6 +20,18 @@ class BaseData:
 
     gateway_name: str
 
+@dataclass
+class SymbolData(BaseData):
+    """
+    Contract data contains basic information about each contract traded.
+    """
+
+    symbol: str
+    exchange: Exchange
+
+    def __post_init__(self):
+        """"""
+        self.vt_symbol = f"{self.symbol}.{self.exchange.value}"
 
 @dataclass
 class TickData(BaseData):
