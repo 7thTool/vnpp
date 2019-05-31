@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Any, Sequence
 
 from ..mtapi.pyMTApi import *
 
@@ -69,16 +69,15 @@ class CMTApi:
     Client for MTApi.
     """
 
-    def __init__(self, event_engine: EventEngine):
+    def __init__(self):
         """"""
-        self.event_engine = event_engine
-
         self.api = MTApi()
         self.api.on_exchange_update = self.on_exchange_update
         self.api.on_product_update = self.on_product_update
         self.api.on_commodity_update = self.on_commodity_update
 
-    def Start(self, xml, xmlflag):
+    def Start(event_engine: EventEngine, self, xml, xmlflag):
+        self.event_engine = event_engine
         self.api.Start(xml, xmlflag)
 
     def Stop(self):
