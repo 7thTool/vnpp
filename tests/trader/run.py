@@ -19,6 +19,7 @@ from vnpy.gateway.onetoken import OnetokenGateway
 from vnpy.gateway.okexf import OkexfGateway
 from vnpy.gateway.xtp import XtpGateway
 from vnpy.gateway.hbdm import HbdmGateway
+from vnpy.gateway.mtapi import MTApiGateway
 
 from vnpy.app.cta_strategy import CtaStrategyApp
 from vnpy.app.csv_loader import CsvLoaderApp
@@ -34,6 +35,7 @@ def main():
     event_engine = EventEngine()
 
     main_engine = MainEngine(event_engine)
+    main_engine.add_gateway(MTApiGateway)
     main_engine.add_gateway(XtpGateway)
     main_engine.add_gateway(CtpGateway)
     # main_engine.add_gateway(CtptestGateway)

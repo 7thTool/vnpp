@@ -26,6 +26,17 @@ from .object import (
     CancelRequest,
     SubscribeRequest,
 )
+from vnpy.event import Event, EventEngine
+from .event import (
+    EVENT_CONTRACT,
+    EVENT_TICK,
+    EVENT_ORDER,
+    EVENT_TRADE,
+    EVENT_POSITION,
+    EVENT_ACCOUNT,
+    EVENT_CONTRACT,
+    EVENT_LOG,
+)
 from enum import Enum, unique
 
 
@@ -58,8 +69,10 @@ class CMTApi:
     Client for MTApi.
     """
 
-    def __init__(self):
+    def __init__(self, event_engine: EventEngine):
         """"""
+        self.event_engine = event_engine
+
         self.api = MTApi()
         self.api.on_exchange_update = self.on_exchange_update
         self.api.on_product_update = self.on_product_update
@@ -90,10 +103,24 @@ class CMTApi:
     def QueryPosition(self):
         """"""
         pass
+        
+    def on_event(self, type: str, data: Any = None):
+        """
+        General event push.
+        """
+        event = Event(type, data)
+        self.event_engine.put(event)
 
     def on_exchange_update(self, dataset, flag):
         #print('on_exchange_update: ', dataset, flag)
-        pass
+        contract = ContractData(
+            symbol=symbol,
+            exchange=exchange,
+            name=name,
+            product=product,
+            size=size,
+            pricetick=pricetick)
+        self.on_event(EVENT_CONTRACT, contract)
 
     def on_product_update(self, dataset, flag):
         #print('OnFrontDisconnected: ', dataset, flag)
