@@ -3,7 +3,7 @@
 
 from datetime import datetime
 
-from vnpy.trader.mtapi import *
+from vnpy.mtapi.mtapi import *
 
 from vnpy.trader.constant import (
     Direction,
@@ -67,7 +67,7 @@ class MTApiGateway(BaseGateway):
         if not md_address.startswith("tcp://"):
             md_address = "tcp://" + md_address
         
-        mtapi.Start("", 0)
+        mtapi.Start(self.event_engine)
 
         self.init_query()
 
